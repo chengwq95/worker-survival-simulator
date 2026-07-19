@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>打工人生存 Simulator 🐟</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐟</text></svg>">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none;
+      -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation; }
+  :root {
+    --bg: #1a1b26; --panel: #24283b; --panel2: #2f344d;
+    --text: #c0caf5; --dim: #565f89; --accent: #7aa2f7;
+    --green: #9ece6a; --red: #f7768e; --yellow: #e0af68; --purple: #bb9af7;
+  }
+  body {
+    background: linear-gradient(-45deg, #16161e, #1f2335, #1a2b4a, #2d1b45, #1a3a3a);
+    background-size: 400% 400%; animation: bgShift 20s ease infinite;
+    color: var(--text);
+    font-family: "PingFang SC", "Microsoft YaHei", monospace, sans-serif;
+    min-height: 100vh; display: flex; justify-content: center; padding: 12px;
+    overflow-x: hidden;
+  }
+  @keyframes bgShift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+  /* 漂浮的办公室元素 */
+  #bgDeco { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+  #bgDeco span {
+    position: absolute; bottom: -60px; opacity: .14; filter: blur(.5px);
+    animation: floatBg linear infinite;
+  }
+  @keyframes floatBg {
+    from { transform: translateY(0) rotate(-8deg); }
+    to { transform: translateY(-115vh) rotate(12deg); }
+  }
+  #app { width: 100%; max-width: 860px; position: relative; z-index: 1; }
+  #topRow h1 {
+    background: linear-gradient(90deg, #7aa2f7, #bb9af7, #9ece6a);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+
+  /* ===== 顶部状态栏 ===== */
+  #statusbar {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px;
+  }
+  .stat {
+    background: linear-gradient(135deg, var(--panel), #2a3050);
+    border-radius: 10px; padding: 8px 12px;
+    border: 2px solid transparent; border-left-width: 4px;
+  }
+  #statusbar .stat:nth-child(1) { border-left-color: var(--yellow); }
+  #statusbar .stat:nth-child(2) { border-left-color: var(--green); }
+  #statusbar .stat:nth-child(3) { border-left-color: var(--purple); }
+  #statusbar .stat:nth-child(4) { border-left-color: var(--red); }
+  .stat .label { font-size: 11px; color: var(--dim); }
+  .stat .value { font-size: 18px; font-weight: bold; }
+  .bar { height: 8px; background: #14151f; border-radius: 4px; margin-top: 4px; overflow: hidden; }
+  .bar > div { height: 100%; border-radius: 4px; transition: width .3s; }
+  #moodFill { background: linear-gradient(90deg, var(--red), var(--yellow), var(--green)); }
+  .warn-dots { letter-spacing: 3px; font-size: 16px; }
+
+  /* ===== 老板警报横幅 ===== */
+  #bossBanner { /* 固定高度常驻，状态切换只变颜色文字，不推挤布局 */
+    display: flex; align-items: center; justify-content: center;
+    height: 46px; padding: 0 10px; border-radius: 10px;
+    font-size: 16px; font-weight: bold; margin-bottom: 10px;
+    background: rgba(36, 40, 59, .6); color: var(--dim);
+    transition: background .3s, color .3s;
+  }
+  #bossBanner.warning { background: #4a3b1a; color: var(--yellow); animation: pulse .5s infinite alternate; }
+  #bossBanner.danger { background: #4a1a2a; color: var(--red); animation: pulse .25s infinite alternate; }
+  #bossBanner.safe { background: #1a4a2a; color: var(--green); }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.02); } }
+
+  /* ===== 主区域 ===== */
+  #main { display: grid; grid-template-columns: 1fr 260px; gap: 10px; }
+  @media (max-width: 700px) { #main { grid-template-columns: 1fr; } #statusbar { grid-template-columns: repeat(2, 1fr); } }
+
+  #taskCard {
+    background: linear-gradient(135deg, var(--panel), #263056);
+    border-radius: 12px; padding: 16px; margin-bottom: 10px;
+    border-left: 4px solid var(--accent);
+  }
+  #taskName { font-size: 16px; margin-bottom: 8px; }
+  #taskBarOuter { height: 22px; background: #14151f; border-radius: 11px; overflow: hidden; position: relative; }
+  #taskFill { height: 100%; background: var(--accent); border-radius: 11px; transition: width .15s; width: 0%; }
+  #taskPct { position: absolute; inset: 0; text-align: center; line-height: 22px; font-size: 12px; font-weight: bold; }
+
+  #buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .bigbtn {
+    padding: 22px 10px; font-size: 22px; font-weight: bold; border: none; border-radius: 14px;
+    cursor: pointer; color: #1a1b26; transition: transform .05s;
+    font-family: inherit;
+  }
+  .bigbtn:active { transform: scale(.95); }
+  #workBtn { background: var(--accent); }
+  #fishBtn { background: var(--green); }
+  .bigbtn small { display: block; font-size: 11px; font-weight: normal; margin-top: 4px; opacity: .75; }
+
+  #skills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .skillbtn {
+    flex: 1; min-width: 110px; padding: 10px 6px; border: none; border-radius: 10px;
+    background: var(--panel2); color: var(--text); cursor: pointer; font-size: 13px;
+    font-family: inherit; position: relative; overflow: hidden;
+  }
+  .skillbtn:disabled { opacity: .4; cursor: not-allowed; }
+  .skillbtn .cd { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--purple); }
+  .skillbtn.locked { opacity: .3; }
+
+  /* ===== 日志 ===== */
+  #logPanel {
+    background: linear-gradient(160deg, var(--panel), #2b2440);
+    border-radius: 12px; padding: 12px; height: 320px;
+    display: flex; flex-direction: column;
+    border-left: 4px solid var(--purple);
+  }
+  #logPanel h3 { font-size: 13px; color: var(--dim); margin-bottom: 6px; }
+  #log { flex: 1; overflow-y: auto; font-size: 12px; line-height: 1.7; }
+  #log div { border-bottom: 1px dashed #2a2e42; padding: 2px 0; }
+  #log .good { color: var(--green); } #log .bad { color: var(--red); } #log .info { color: var(--yellow); }
+
+  /* ===== 消息弹窗 ===== */
+  #msgPop {
+    display: none; position: fixed; right: 16px; bottom: 16px; width: 280px;
+    background: var(--panel2); border-radius: 12px; padding: 14px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.5); z-index: 50; border-left: 4px solid var(--yellow);
+    animation: slideIn .3s;
+  }
+  @keyframes slideIn { from { transform: translateX(120%); } to { transform: translateX(0); } }
+  #msgPop .from { font-size: 12px; color: var(--yellow); margin-bottom: 4px; }
+  #msgPop .content { font-size: 14px; margin-bottom: 10px; }
+  #msgPop button {
+    width: 100%; padding: 8px; border: none; border-radius: 8px; background: var(--yellow);
+    color: #1a1b26; font-weight: bold; cursor: pointer; font-family: inherit;
+  }
+  #msgTimer { height: 4px; background: var(--red); border-radius: 2px; margin-top: 8px; transition: width .1s linear; }
+
+  /* ===== 模态框(事件/成就/结束) ===== */
+  .modal-mask {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 100;
+    justify-content: center; align-items: center;
+  }
+  .modal-mask.show { display: flex; }
+  .modal {
+    background: var(--panel); border-radius: 16px; padding: 24px; width: 90%; max-width: 420px;
+    text-align: center; animation: popIn .25s;
+  }
+  @keyframes popIn { from { transform: scale(.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .modal h2 { margin-bottom: 12px; font-size: 20px; }
+  .modal p { margin-bottom: 16px; font-size: 14px; line-height: 1.6; color: var(--text); }
+  .modal button {
+    display: block; width: 100%; padding: 12px; margin-top: 8px; border: none; border-radius: 10px;
+    background: var(--panel2); color: var(--text); cursor: pointer; font-size: 14px; font-family: inherit;
+  }
+  .modal button:hover { background: var(--accent); color: #1a1b26; }
+  .modal button.primary { background: var(--accent); color: #1a1b26; font-weight: bold; }
+
+  /* ===== 成就吐司 ===== */
+  #toast {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-120px);
+    background: var(--purple); color: #1a1b26; padding: 10px 20px; border-radius: 999px;
+    font-weight: bold; z-index: 200; transition: transform .4s; font-size: 14px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.4);
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ===== 顶部小按钮 ===== */
+  #topRow { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  #topRow h1 { font-size: 18px; }
+  #topRow .mini {
+    background: var(--panel2); border: none; color: var(--text); padding: 6px 12px;
+    border-radius: 8px; cursor: pointer; font-size: 12px; margin-left: 6px; font-family: inherit;
+  }
+  #achList { text-align: left; max-height: 300px; overflow-y: auto; }
+  #achList div { padding: 6px 0; border-bottom: 1px dashed #2a2e42; font-size: 13px; }
+  #achList .locked { opacity: .35; }
+
+  .float-txt {
+    position: fixed; pointer-events: none; font-weight: bold; font-size: 16px; z-index: 60;
+    animation: floatUp 1s forwards;
+  }
+  @keyframes floatUp { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-50px); } }
+</style>
+</head>
+<body>
+<div id="bgDeco"></div>
+<div id="app">
+  <div id="topRow">
+    <h1>🏢 打工人生存 Simulator</h1>
+    <div>
+      <button class="mini" onclick="showShop()">🛒 商店</button>
+      <button class="mini" onclick="showLB()">🏅 排行</button>
+      <button class="mini" id="sndBtn">🔊 音效</button>
+      <button class="mini" onclick="showAch()">🏆 成就</button>
+      <button class="mini" onclick="location.reload()">🔄 重开</button>
+    </div>
+  </div>
+
+  <div id="statusbar">
+    <div class="stat"><div class="label">💰 工资 (总分)</div><div class="value" id="moneyV">¥0</div></div>
+    <div class="stat"><div class="label">😊 心情</div><div class="value" id="moodV">100</div>
+      <div class="bar"><div id="moodFill" style="width:100%"></div></div></div>
+    <div class="stat"><div class="label" id="levelLabel">👔 职级</div><div class="value" id="levelV">实习生</div></div>
+    <div class="stat"><div class="label">⚠️ 警告 (3次开除) · 📅 <span id="dayV">1</span>天</div>
+      <div class="value warn-dots" id="warnV">○○○</div></div>
+  </div>
+
+  <div id="bossBanner">🏢 办公室风平浪静，适合摸鱼</div>
+
+  <div id="main">
+    <div>
+      <div id="taskCard">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap">
+          <div id="taskName">📋 当前任务：加载中...</div>
+          <div id="kpiV" style="font-size:13px;color:var(--yellow);white-space:nowrap">🎯 今日KPI 0/1</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px;margin-bottom:6px">
+          <span id="modV" style="color:var(--purple)"></span>
+          <span id="chV" style="color:var(--green)"></span>
+        </div>
+        <div id="taskBarOuter"><div id="taskFill"></div><div id="taskPct">0%</div></div>
+      </div>
+      <div id="buttons">
+        <button class="bigbtn" id="workBtn">💼 努力工作<small>推进任务 · 消耗心情</small></button>
+        <button class="bigbtn" id="fishBtn">🐟 摸鱼<small>回复心情 · 小心老板</small></button>
+      </div>
+      <div id="comboV" style="height:22px;line-height:22px;text-align:center;font-weight:bold;color:var(--yellow);margin-bottom:8px;font-size:15px"></div>
+      <button id="hustleBtn" class="skillbtn" style="width:100%;margin-bottom:10px;border-left:3px solid var(--yellow)">📈 摸鱼副业 <small>高风险高收益 · 被老板撞见罚款加倍</small><div class="cd" style="width:0%"></div></button>
+      <div id="skills"></div>
+      <div id="npcRow" style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"></div>
+    </div>
+    <div id="logPanel">
+      <h3>📜 办公室实况</h3>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 消息弹窗 -->
+<div id="msgPop">
+  <div class="from" id="msgFrom"></div>
+  <div class="content" id="msgContent"></div>
+  <button id="msgReply">立即回复 ✍️</button>
+  <div id="msgTimer" style="width:100%"></div>
+</div>
+
+<!-- 随机事件模态 -->
+<div class="modal-mask" id="eventMask"><div class="modal">
+  <h2 id="evTitle"></h2><p id="evDesc"></p>
+  <button id="evBtn1"></button><button id="evBtn2"></button>
+</div></div>
+
+<!-- 成就面板 -->
+<div class="modal-mask" id="achMask"><div class="modal">
+  <h2>🏆 成就</h2><div id="achList"></div>
+  <button class="primary" onclick="document.getElementById('achMask').classList.remove('show')">关闭</button>
+</div></div>
+
+<!-- 开始/结束 -->
+<div class="modal-mask show" id="startMask"><div class="modal">
+  <h2>🏢 打工人生存 Simulator</h2>
+  <p>💼 点「努力工作」推进任务赚工资<br>🐟 点「摸鱼」回复心情<br>
+  👀 老板巡逻时千万别摸鱼！<br>💬 及时回复消息，别让甲方等<br>
+  😱 心情归零会提桶跑路，被抓3次会被开除<br><br>祝你早日当上CEO（不可能的）</p>
+  <button class="primary" id="startBtn">🚀 开始搬砖</button>
+</div></div>
+
+<div class="modal-mask" id="overMask"><div class="modal">
+  <h2 id="overTitle"></h2><p id="overDesc"></p>
+  <button class="primary" onclick="location.reload()">🔄 再来一局</button>
+</div></div>
+
+<!-- 突击汇报 QTE -->
+<div class="modal-mask" id="qteMask"><div class="modal">
+  <h2>🚨 老板突击检查！</h2>
+  <p id="qteDesc">"来，说说你最近在忙什么？"<br>疯狂点击下面的按钮组织语言！</p>
+  <button class="primary" id="qteBtn" style="font-size:18px;padding:18px">🗣️ 疯狂汇报！</button>
+  <div class="bar" style="margin-top:12px"><div id="qteFill" style="width:0%;background:var(--purple)"></div></div>
+  <div class="bar" style="margin-top:6px"><div id="qteTime" style="width:100%;background:var(--red)"></div></div>
+</div></div>
+
+<!-- 商店 -->
+<div class="modal-mask" id="shopMask"><div class="modal">
+  <h2>🛒 工位装备商店</h2>
+  <p style="font-size:12px;color:var(--dim);margin-bottom:8px">买了永久生效 · 游戏不会暂停，小心老板</p>
+  <div id="shopList" style="text-align:left;max-height:300px;overflow-y:auto"></div>
+  <button class="primary" onclick="document.getElementById('shopMask').classList.remove('show')">关闭</button>
+</div></div>
+
+<!-- 副业 -->
+<div class="modal-mask" id="hustleMask"><div class="modal">
+  <h2>📈 摸鱼副业</h2>
+  <p style="font-size:12px;color:var(--dim)">⚠️ 游戏不会暂停！老板在场时搞副业会被抓+罚款加倍</p>
+  <div id="hustleList"></div>
+  <button onclick="document.getElementById('hustleMask').classList.remove('show')">算了，继续搬砖</button>
+</div></div>
+
+<!-- 排行榜 -->
+<div class="modal-mask" id="lbMask"><div class="modal">
+  <h2>🏅 本地排行榜</h2>
+  <div id="lbList" style="text-align:left;font-size:13px;max-height:300px;overflow-y:auto"></div>
+  <button class="primary" onclick="document.getElementById('lbMask').classList.remove('show')">关闭</button>
+</div></div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+// ================== 音效 (Web Audio 合成) ==================
+let muted = false, actx = null;
+function beep(freq, dur = 0.08, type = "square", vol = 0.12, delay = 0) {
+  if (muted) return;
+  try {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    const t = actx.currentTime + delay;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(t); o.stop(t + dur);
+  } catch (e) { /* 音频不可用时静默 */ }
+}
+const SFX = {
+  work:   () => beep(200 + Math.random() * 80, .04, "square", .06),
+  fish:   () => beep(550 + Math.random() * 250, .07, "sine", .09),
+  coin:   () => { beep(880, .07, "square", .09); beep(1320, .12, "square", .09, .07); },
+  alarm:  () => { beep(740, .14, "sawtooth", .1); beep(520, .14, "sawtooth", .1, .17); },
+  danger: () => { beep(880, .09, "square", .16); beep(660, .09, "square", .16, .1); beep(880, .22, "square", .16, .2); },
+  caught: () => { beep(300, .2, "sawtooth", .13); beep(180, .35, "sawtooth", .13, .2); },
+  levelup:() => [523, 659, 784, 1047].forEach((f, i) => beep(f, .12, "triangle", .11, i * .09)),
+  msg:    () => { beep(1000, .06, "sine", .1); beep(1350, .09, "sine", .1, .08); },
+  ach:    () => [784, 988, 1319].forEach((f, i) => beep(f, .1, "triangle", .11, i * .08)),
+  over:   () => [392, 330, 262, 165].forEach((f, i) => beep(f, .22, "sawtooth", .11, i * .18)),
+  qte:    () => beep(140 + Math.random() * 40, .04, "square", .08),
+};
+
+// ================== 游戏状态 ==================
+const S = {
+  money: 0, totalEarned: 0, mood: 100, warnings: 0, day: 1,
+  level: 0, tasksDone: 0, fishClicks: 0, workClicks: 0, msgsHandled: 0,
+  caughtCount: 0, running: false, paused: false,
+  bossState: "idle", // idle | warning | present
+  immuneUntil: 0, toiletUntil: 0,
+  task: null, dayTimer: 0,
+  kpiToday: 0, kpiFails: 0, qteDone: 0,
+  gear: {}, combo: 0, comboType: null, comboLast: 0, maxCombo: 0,
+  hustleCd: 0, hustleCount: 0,
+  npc: { kevin: 50, aqiang: 50, lin: 50 }, consumeCount: 0,
+  dailyMod: null, boss: null, challenge: null, chDone: false,
+  dayBase: {}, dayComboBest: 0, chestCount: 0,
+};
+const kpiTarget = () => Math.min(5, 1 + Math.floor((S.day - 1) / 2));
+const diffFactor = () => Math.max(0.35, 1 - (S.day - 1) * 0.08); // 天数越多老板越勤
+
+const LEVELS = [
+  { name: "实习生", emoji: "🧑‍🎓", need: 0, salary: 30 },
+  { name: "初级牛马", emoji: "🐴", need: 200, salary: 45 },
+  { name: "资深社畜", emoji: "🐮", need: 550, salary: 65 },
+  { name: "卷王主管", emoji: "🌀", need: 1200, salary: 90 },
+  { name: "摸鱼经理", emoji: "🐟", need: 2400, salary: 120 },
+  { name: "划水总监", emoji: "🏄", need: 4500, salary: 160 },
+  { name: "CEO(做梦版)", emoji: "👑", need: 8000, salary: 250 },
+];
+
+const TASKS = [
+  "写一份没人看的周报", "改第18版PPT", "回复甲方\"在吗\"", "修复自己写的bug",
+  "整理永远整理不完的Excel", "给领导的朋友圈点赞", "参加本可以是邮件的会议",
+  "写明天要交的年度规划", "解释为什么进度延期", "假装在做用户调研",
+  "把方案A改回方案B再改回A", "优化一个没人用的功能",
+];
+
+const SKILLS = [
+  { id: "toilet", name: "🚽 带薪拉屎", lvl: 1, cd: 30, desc: "+25心情,5秒防抓",
+    fx: () => { S.mood = Math.min(100, S.mood + 25); S.toiletUntil = now() + 5000;
+      log("🚽 你在马桶上刷了5分钟手机，心情+25", "good"); } },
+  { id: "meeting", name: "📊 假装开会", lvl: 2, cd: 45, desc: "10秒老板免疫",
+    fx: () => { S.immuneUntil = now() + 10000;
+      log("📊 你抱着笔记本装作去开会，10秒内老板抓不到你", "good"); } },
+  { id: "blame", name: "🪃 甩锅同事", lvl: 3, cd: 60, desc: "消除1次警告",
+    can: () => S.warnings > 0,
+    fx: () => { S.warnings--; log("🪃 你成功把锅甩给了隔壁工位，警告-1", "good"); } },
+  { id: "coffee", name: "☕ 冰美式续命", lvl: 4, cd: 40, desc: "+15心情,任务+10%",
+    fx: () => { S.mood = Math.min(100, S.mood + 15); addProgress(10);
+      log("☕ 一口冰美式下肚，效率拉满！", "good"); } },
+];
+
+const MESSAGES = [
+  { from: "🤵 甲方爸爸", text: "在吗？logo能不能再大一点？" },
+  { from: "👔 老板", text: "那个方案今天能给我吗？" },
+  { from: "🧑‍💼 HR", text: "麻烦填一下这个满意度问卷~" },
+  { from: "🤵 甲方爸爸", text: "我们想要五彩斑斓的黑" },
+  { from: "🧑‍🤝‍🧑 同事", text: "帮我带杯奶茶呗，三分糖去冰" },
+  { from: "👔 老板", text: "周末有空吗？没别的意思" },
+  { from: "🤵 甲方爸爸", text: "需求改了，明天上线没问题吧？" },
+  { from: "🧑‍🤝‍🧑 同事", text: "这个bug是不是你写的？" },
+];
+
+const EVENTS = [
+  { title: "🎰 年会抽奖", desc: "年会抽奖轮到你了！上台还是躲厕所？",
+    o1: { t: "上台抽奖", fx: () => Math.random() < 0.3
+      ? gain(200, "🎉 中了二等奖！奖金¥200！")
+      : moodHit(10, "😑 抽中了'谢谢参与'，还被主持人cue唱歌") },
+    o2: { t: "躲进厕所", fx: () => moodUp(5, "🚽 你在厕所里安静地刷完了年会") } },
+  { title: "📋 甲方改需求", desc: "甲方第8次改需求，而且要今天交。",
+    o1: { t: "连夜爆改", fx: () => { gain(80, "💪 爆肝完成！甲方很满意，工资+80"); moodHit(15, "但你头发又少了一撮"); } },
+    o2: { t: "已读不回", fx: () => Math.random() < 0.5
+      ? moodUp(10, "😌 甲方居然自己想通了，用回第1版")
+      : lose(50, "📞 甲方打给了你老板…扣款¥50") } },
+  { title: "🍱 中午吃什么", desc: "永恒难题：外卖还是食堂？",
+    o1: { t: "点外卖 (¥30)", fx: () => { lose(30, ""); moodUp(15, "🍜 外卖真香，心情+15 (花了¥30)"); } },
+    o2: { t: "吃食堂", fx: () => moodHit(5, "🥬 今天又是熟悉的土豆丝盖饭…") } },
+  { title: "💻 电脑蓝屏", desc: "写了3小时的文档没保存，电脑蓝屏了。",
+    o1: { t: "重启硬扛", fx: () => { S.task && (S.task.progress = Math.max(0, S.task.progress - 30)); moodHit(15, "💀 进度丢失30%，你想砸电脑"); render(); } },
+    o2: { t: "找IT小哥", fx: () => Math.random() < 0.6
+      ? moodUp(8, "🔧 IT小哥抢救回了文档！他是天使")
+      : moodHit(10, "🔧 IT小哥说'重启试试'，然后走了") } },
+  { title: "🧧 同事结婚", desc: "不太熟的同事发来婚礼请柬。",
+    o1: { t: "随份子 (¥100)", fx: () => { lose(100, ""); moodUp(5, "🧧 随了¥100，混了顿饭还行"); } },
+    o2: { t: "装没看见", fx: () => moodHit(8, "😬 电梯里遇到他，气氛尴尬到窒息") } },
+  { title: "📈 老板画饼", desc: "老板把你叫进办公室：'好好干，明年给你升职加薪！'",
+    o1: { t: "信了", fx: () => moodUp(15, "🥰 心情+15（饼很香，虽然吃不到）") },
+    o2: { t: "微笑点头内心翻白眼", fx: () => { moodUp(5, "🙄 你熟练地表演了感动"); gain(20, "老板高兴，塞给你饭补¥20"); } } },
+  { title: "🐟 摸鱼被同事发现", desc: "同事看到你在逛购物网站…",
+    o1: { t: "拉他一起摸", fx: () => moodUp(12, "🤝 摸鱼搭子+1，快乐翻倍") },
+    o2: { t: "假装在做竞品分析", fx: () => Math.random() < 0.7
+      ? moodUp(5, "😎 '我在研究电商交互'，糊弄过去了")
+      : moodHit(10, "😅 他截图发到了部门群…") } },
+  { title: "⏰ 到点下班?", desc: "18:00整。老板还没走，你走不走？",
+    o1: { t: "准点跑路", fx: () => Math.random() < 0.6
+      ? moodUp(20, "🏃 成功溜了！晚上的奶茶格外香甜")
+      : warn("👀 在电梯口撞见老板…'这么早就走？'") },
+    o2: { t: "假装加班", fx: () => { gain(40, "🌙 表演式加班1小时，加班费+40"); moodHit(10, "但你错过了球赛"); } } },
+  { title: "📡 公司断网了", desc: "整层楼的网都崩了，IT小哥满头大汗地跑来跑去。",
+    o1: { t: "趁机光明正大摸鱼", fx: () => moodUp(15, "😌 '网断了不怪我'，你心安理得地发起了呆") },
+    o2: { t: "开手机热点继续卷", fx: () => { gain(50, "📱 全公司只有你还在干活，老板看在眼里"); moodHit(12, "但流量费和电量都在燃烧"); } } },
+  { title: "🗳️ 办公室政治", desc: "两位领导明争暗斗，都想拉你站队。",
+    o1: { t: "押注A领导", fx: () => Math.random() < 0.5
+      ? gain(120, "🎰 A领导斗赢了！你跟着喝了口汤")
+      : warn("💥 A领导被调走了，新领导把你记在了小本本上…") },
+    o2: { t: "当职场小透明", fx: () => moodHit(5, "🫥 两边都觉得你不上道，但至少安全") } },
+  { title: "🖨️ 打印机之灵", desc: "全公司只有你会修打印机，行政又来找你了。",
+    o1: { t: "去修 (义务劳动)", fx: () => { moodHit(8, "🔧 修了半小时，耽误了自己的活"); Math.random() < 0.4 && gain(30, "行政请你喝了杯奶茶"); } },
+    o2: { t: "装作不会", fx: () => Math.random() < 0.6
+      ? moodUp(5, "🤫 '我也不太懂诶'，成功脱身")
+      : moodHit(10, "😅 行政：'上次不是你修好的吗？' 场面一度尴尬") } },
+];
+
+// ================== 突击汇报 QTE ==================
+let qteTimer = null;
+function scheduleQte() { setTimeout(tryQte, 35000 + Math.random() * 35000); }
+function tryQte() {
+  if (!S.running) return;
+  if (S.paused || msgActive) { setTimeout(tryQte, 8000); return; }
+  S.paused = true;
+  const need = 8 + Math.min(10, S.day * 2); // 天数越多要点越多次
+  let clicks = 0;
+  const deadline = now() + 5000;
+  $("qteDesc").innerHTML = `"来，说说你最近在忙什么？"<br>5秒内疯狂点击 <b>${need}</b> 次组织语言！`;
+  $("qteFill").style.width = "0%";
+  $("qteMask").classList.add("show");
+  SFX.alarm();
+  $("qteBtn").onclick = () => {
+    clicks++; SFX.qte();
+    $("qteFill").style.width = Math.min(100, clicks / need * 100) + "%";
+    if (clicks >= need) finishQte(true);
+  };
+  qteTimer = setInterval(() => {
+    const remain = deadline - now();
+    $("qteTime").style.width = Math.max(0, remain / 5000 * 100) + "%";
+    if (remain <= 0) finishQte(false);
+  }, 100);
+  function finishQte(ok) {
+    clearInterval(qteTimer);
+    $("qteMask").classList.remove("show");
+    S.paused = false; S.qteDone++;
+    if (ok) {
+      gain(40, "🗣️ 你临场编出了一套漂亮的汇报话术，老板频频点头");
+      moodHit(5, "");
+    } else {
+      warn("😨 你支支吾吾半天说不出话，老板皱起了眉头…");
+      moodHit(10, "");
+    }
+    checkAch();
+    scheduleQte();
+  }
+}
+
+const ACHIEVEMENTS = [
+  { id: "firstTask", name: "🔨 第一块砖", desc: "完成第一个任务", chk: () => S.tasksDone >= 1 },
+  { id: "task10", name: "🧱 搬砖专业户", desc: "完成10个任务", chk: () => S.tasksDone >= 10 },
+  { id: "fish50", name: "🐟 摸鱼学徒", desc: "摸鱼50次", chk: () => S.fishClicks >= 50 },
+  { id: "fish200", name: "🐋 摸鱼大师", desc: "摸鱼200次", chk: () => S.fishClicks >= 200 },
+  { id: "caught1", name: "😅 社死现场", desc: "第一次被老板抓到", chk: () => S.caughtCount >= 1 },
+  { id: "day3", name: "📅 周中战士", desc: "生存3天", chk: () => S.day >= 3 },
+  { id: "day7", name: "🗓️ 打满一周", desc: "生存7天", chk: () => S.day >= 7 },
+  { id: "rich", name: "💰 小富即安", desc: "累计赚到¥3000", chk: () => S.totalEarned >= 3000 },
+  { id: "maxLevel", name: "👑 位极人臣", desc: "升到最高职级", chk: () => S.level >= LEVELS.length - 1 },
+  { id: "msg10", name: "💬 秒回小能手", desc: "处理10条消息", chk: () => S.msgsHandled >= 10 },
+  { id: "moodMax", name: "😊 精神状态良好", desc: "心情保持满值", chk: () => S.mood >= 100 && S.tasksDone >= 1 },
+  { id: "qte3", name: "🗣️ 汇报艺术家", desc: "经历3次突击汇报", chk: () => S.qteDone >= 3 },
+  { id: "gear3", name: "🛍️ 装备党", desc: "购买3件工位装备", chk: () => Object.keys(S.gear).length >= 3 },
+  { id: "gearAll", name: "🏰 工位豪宅", desc: "集齐全部装备", chk: () => Object.keys(S.gear).length >= GEAR.length },
+  { id: "hustle5", name: "🎲 副业狂魔", desc: "搞5次副业", chk: () => S.hustleCount >= 5 },
+  { id: "combo20", name: "🔥 连击之王", desc: "达成20连击", chk: () => S.maxCombo >= 20 },
+  { id: "popular", name: "🫶 人缘之王", desc: "三位同事好感都≥70", chk: () => Object.values(S.npc).every(v => v >= 70) },
+  { id: "chest3", name: "🎁 委托达人", desc: "完成3次每日委托", chk: () => S.chestCount >= 3 },
+  { id: "milk10", name: "🧋 消费主义战士", desc: "购买10次消耗品", chk: () => S.consumeCount >= 10 },
+];
+const unlockedAch = new Set();
+
+// ================== 工具函数 ==================
+const $ = id => document.getElementById(id);
+const now = () => Date.now();
+function log(msg, cls) {
+  const d = document.createElement("div");
+  d.textContent = msg; if (cls) d.className = cls;
+  const el = $("log"); el.prepend(d);
+  while (el.children.length > 40) el.removeChild(el.lastChild);
+}
+function floatText(txt, color, x, y) {
+  const d = document.createElement("div");
+  d.className = "float-txt"; d.textContent = txt; d.style.color = color;
+  d.style.left = (x - 20) + "px"; d.style.top = (y - 30) + "px";
+  document.body.appendChild(d); setTimeout(() => d.remove(), 1000);
+}
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2500);
+}
+function gain(n, msg) { S.money += n; S.totalEarned += n; if (msg) { log(msg + ` (+¥${n})`, "good"); if (n >= 10) SFX.coin(); } checkLevel(); render(); }
+function lose(n, msg) { S.money = Math.max(0, S.money - n); if (msg) log(msg, "bad"); render(); }
+function moodUp(n, msg) { S.mood = Math.min(100, S.mood + n); if (msg) log(msg, "good"); render(); }
+function moodHit(n, msg) { S.mood = Math.max(0, S.mood - n * (S.gear.plant ? 0.8 : 1)); if (msg) log(msg, "bad"); render(); checkDeath(); }
+function warn(msg) {
+  S.warnings++; S.caughtCount++; log(msg + ` 警告 ${S.warnings}/3`, "bad");
+  SFX.caught();
+  render(); checkDeath();
+}
+
+// ================== 任务系统 ==================
+function newTask() {
+  S.task = { name: TASKS[Math.floor(Math.random() * TASKS.length)], progress: 0 };
+  render();
+}
+function addProgress(n) {
+  if (!S.task) return;
+  S.task.progress += n;
+  if (S.task.progress >= 100) {
+    S.tasksDone++; S.kpiToday++;
+    const pay = Math.floor((LEVELS[S.level].salary + Math.floor(Math.random() * 20)) * (S.gear.monitor ? 1.2 : 1) * modOf("pay"));
+    gain(pay, `✅ 完成「${S.task.name}」`);
+    newTask();
+  }
+  render();
+}
+
+// ================== 职级 ==================
+function checkLevel() {
+  while (S.level < LEVELS.length - 1 && S.totalEarned >= LEVELS[S.level + 1].need) {
+    S.level++;
+    const L = LEVELS[S.level];
+    log(`🎉 升职了！你现在是「${L.emoji} ${L.name}」，任务工资提升到¥${L.salary}`, "info");
+    toast(`🎉 升职：${L.emoji} ${L.name}`);
+    SFX.levelup();
+    renderSkills();
+  }
+}
+
+// ================== 技能 ==================
+const skillCd = {};
+function renderSkills() {
+  const box = $("skills"); box.innerHTML = "";
+  SKILLS.forEach(sk => {
+    const b = document.createElement("button");
+    b.className = "skillbtn"; b.id = "sk_" + sk.id;
+    const locked = S.level < sk.lvl;
+    b.innerHTML = locked
+      ? `🔒 ${sk.name}<br><small>Lv${sk.lvl + 1}职级解锁</small>`
+      : `${sk.name}<br><small>${sk.desc}</small><div class="cd" style="width:0%"></div>`;
+    if (locked) b.classList.add("locked");
+    b.disabled = locked;
+    b.onclick = () => useSkill(sk);
+    box.appendChild(b);
+  });
+}
+function useSkill(sk) {
+  if (skillCd[sk.id] && now() < skillCd[sk.id]) return;
+  if (S.paused || !S.running) return;
+  if (sk.can && !sk.can()) { toast("🪃 现在没有锅可甩"); return; }
+  sk.fx();
+  skillCd[sk.id] = now() + sk.cd * 1000 * (S.gear.coffee_machine ? 0.75 : 1);
+  render();
+}
+function tickSkillCd() {
+  SKILLS.forEach(sk => {
+    const b = $("sk_" + sk.id); if (!b || S.level < sk.lvl) return;
+    const end = skillCd[sk.id] || 0, remain = end - now();
+    b.disabled = remain > 0 || (sk.can && !sk.can());
+    const cd = b.querySelector(".cd");
+    if (cd) cd.style.width = remain > 0 ? (remain / (sk.cd * 1000) * 100) + "%" : "0%";
+  });
+  const hb = $("hustleBtn");
+  if (hb) {
+    const remain = S.hustleCd - now();
+    hb.disabled = remain > 0 || !S.running;
+    const cd = hb.querySelector(".cd");
+    if (cd) cd.style.width = remain > 0 ? (remain / 15000 * 100) + "%" : "0%";
+  }
+}
+
+// ================== 老板巡逻 ==================
+let bossTimeout = null, stepTimer = null, sirenTimer = null;
+function startSteps() { // 预警阶段循环播放逼近的脚步声
+  clearInterval(stepTimer);
+  let i = 0;
+  stepTimer = setInterval(() => {
+    if (S.bossState !== "warning" || !S.running) { clearInterval(stepTimer); return; }
+    beep(85 + (i % 2) * 25, .07, "sine", .2); // 咚…咚…
+    i++;
+  }, 380);
+}
+function startSiren() { // 预警阶段持续鸣笛：老板来之前一直响，催你赶紧收手
+  clearInterval(sirenTimer);
+  let i = 0;
+  const blast = () => { beep(i % 2 ? 520 : 740, .16, "sawtooth", .13); i++; };
+  blast();
+  sirenTimer = setInterval(() => {
+    if (S.bossState !== "warning" || !S.running) { clearInterval(sirenTimer); return; }
+    blast();
+  }, 320);
+}
+function scheduleBoss() {
+  clearTimeout(bossTimeout);
+  bossTimeout = setTimeout(bossWarning, (8000 + Math.random() * 14000) * diffFactor() * modOf("bossDelay") * bossOf().freq);
+}
+function bossWarning() {
+  if (!S.running || S.paused) { scheduleBoss(); return; }
+  if (Math.random() < bossOf().sneak) { // 幽灵型：无预警直接出现
+    log("🕶️ 老板悄无声息地出现在你身后！", "bad");
+    SFX.alarm();
+    bossArrive();
+    return;
+  }
+  S.bossState = "warning";
+  setBanner("warning", "👀 脚步声越来越近…老板要来了！");
+  log("👀 隔壁传来老板的脚步声…", "info");
+  startSiren();
+  startSteps();
+  const linBonus = S.npc.lin >= 70 ? 1.5 : 1; // 琳姐提前通风报信
+  setTimeout(bossArrive, (2200 + Math.random() * 1300) * Math.max(0.5, diffFactor()) * bossOf().warnT * linBonus);
+}
+function bossArrive() {
+  if (!S.running) return;
+  S.bossState = "present";
+  clearInterval(stepTimer); clearInterval(sirenTimer);
+  SFX.danger(); // 到场只响一记，之后安静潜伏
+  setBanner("danger", "🕴️ 老板就在你身后！千万别摸鱼！！");
+  setTimeout(bossLeave, Math.min(8000, (2500 + Math.random() * 2000 + (S.day - 1) * 250) * bossOf().stayT));
+}
+function bossLeave() {
+  if (!S.running) return;
+  S.bossState = "idle";
+  clearInterval(sirenTimer);
+  beep(523, .1, "triangle", .1); beep(659, .15, "triangle", .1, .1); // 解除警报音
+  setBanner("safe", "😮‍💨 老板走了，警报解除");
+  setTimeout(() => { if (S.bossState === "idle") setBanner(null); }, 1500);
+  scheduleBoss();
+}
+function setBanner(cls, txt) {
+  const b = $("bossBanner");
+  b.className = cls || "";
+  b.textContent = txt || "🏢 办公室风平浪静，适合摸鱼";
+}
+function isProtected() { return now() < S.immuneUntil || now() < S.toiletUntil; }
+
+// ================== 消息系统 ==================
+let msgTimer = null, msgDeadline = 0, msgActive = false;
+function scheduleMsg() { setTimeout(tryMsg, 12000 + Math.random() * 15000); }
+function tryMsg() {
+  if (!S.running) return;
+  if (S.paused || msgActive) { setTimeout(tryMsg, 5000); return; }
+  const m = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
+  if (S.gear.autoreply && Math.random() < 0.5) {
+    S.msgsHandled++;
+    gain(15, `🤖 自动回复脚本秒回了「${m.from}」的消息`);
+    checkAch(); scheduleMsg();
+    return;
+  }
+  msgActive = true;
+  $("msgFrom").textContent = m.from;
+  $("msgContent").textContent = m.text;
+  $("msgPop").style.display = "block";
+  SFX.msg();
+  const msgDur = 6000 + (S.gear.headphones ? 3000 : 0);
+  msgDeadline = now() + msgDur;
+  msgTimer = setInterval(() => {
+    const remain = msgDeadline - now();
+    $("msgTimer").style.width = Math.max(0, remain / msgDur * 100) + "%";
+    if (remain <= 0) {
+      closeMsg();
+      moodHit(8, "📵 你无视了消息，对方开始夺命连环call…心情-8");
+      lose(20, "");
+    }
+  }, 100);
+}
+function closeMsg() {
+  clearInterval(msgTimer); msgActive = false;
+  $("msgPop").style.display = "none";
+  scheduleMsg();
+}
+$("msgReply").onclick = () => {
+  closeMsg(); S.msgsHandled++;
+  gain(15, "💬 秒回消息，职业素养拉满");
+  checkAch();
+};
+
+// ================== 随机事件 ==================
+function scheduleEvent() { setTimeout(tryEvent, 25000 + Math.random() * 20000); }
+function tryEvent() {
+  if (!S.running) return;
+  if (S.paused || msgActive) { setTimeout(tryEvent, 8000); return; }
+  const pool = Math.random() < 0.4 ? NPC_EVENTS : EVENTS; // 40%概率是同事事件
+  const ev = pool[Math.floor(Math.random() * pool.length)];
+  S.paused = true;
+  $("evTitle").textContent = ev.title;
+  $("evDesc").textContent = ev.desc;
+  $("evBtn1").textContent = ev.o1.t;
+  $("evBtn2").textContent = ev.o2.t;
+  $("evBtn1").onclick = () => { closeEvent(); ev.o1.fx(); checkAch(); };
+  $("evBtn2").onclick = () => { closeEvent(); ev.o2.fx(); checkAch(); };
+  $("eventMask").classList.add("show");
+}
+function closeEvent() {
+  $("eventMask").classList.remove("show");
+  S.paused = false;
+  scheduleEvent();
+}
+
+// ================== 成就 ==================
+function checkAch() {
+  ACHIEVEMENTS.forEach(a => {
+    if (!unlockedAch.has(a.id) && a.chk()) {
+      unlockedAch.add(a.id);
+      toast(`🏆 成就解锁：${a.name}`);
+      SFX.ach();
+      log(`🏆 成就解锁：${a.name} — ${a.desc}`, "info");
+    }
+  });
+}
+function showAch() {
+  const list = $("achList"); list.innerHTML = "";
+  ACHIEVEMENTS.forEach(a => {
+    const d = document.createElement("div");
+    d.textContent = `${unlockedAch.has(a.id) ? "✅" : "🔒"} ${a.name} — ${a.desc}`;
+    if (!unlockedAch.has(a.id)) d.className = "locked";
+    list.appendChild(d);
+  });
+  $("achMask").classList.add("show");
+}
+
+// ================== 商店 ==================
+const GEAR = [
+  { id: "chair", name: "🪑 人体工学椅", price: 300, desc: "心情流失 -30%" },
+  { id: "monitor", name: "🖥️ 显示器支架", price: 350, desc: "任务工资 +20%" },
+  { id: "keyboard", name: "⌨️ 机械键盘", price: 400, desc: "工作进度 +25%" },
+  { id: "fishtank", name: "🐠 桌面小鱼缸", price: 450, desc: "摸鱼回复 +50%" },
+  { id: "headphones", name: "🎧 降噪耳机", price: 500, desc: "消息倒计时 +3秒" },
+  { id: "coffee_machine", name: "☕ 私人咖啡机", price: 600, desc: "技能冷却 -25%" },
+  { id: "plant", name: "🌵 桌面绿植", price: 250, desc: "一切心情伤害 -20%" },
+  { id: "phone", name: "📱 备用摸鱼手机", price: 550, desc: "每次摸鱼额外 +¥3" },
+  { id: "autoreply", name: "🤖 自动回复脚本", price: 700, desc: "50%概率自动秒回消息" },
+  { id: "window_seat", name: "🪟 靠窗工位", price: 800, desc: "每秒被动回复心情" },
+  { id: "cat", name: "🐈 办公室猫猫", price: 1000, desc: "摸鱼被抓时50%概率猫猫救场" },
+  { id: "massage", name: "💺 按摩椅", price: 1500, desc: "摸鱼10%概率触发深度放松 心情+10" },
+];
+const CONSUMABLES = [
+  { name: "🧋 三分糖奶茶", price: 50, desc: "心情+20，打工人的血包",
+    fx: () => moodUp(20, "🧋 一口下去，感觉又能干8小时（并不能）") },
+  { name: "🍱 豪华外卖", price: 100, desc: "心情+35，吃点好的",
+    fx: () => moodUp(35, "🍱 日式豚骨拉面加溏心蛋，值了") },
+  { name: "🎟️ 刮刮乐", price: 50, desc: "5%中¥1000 · 20%中¥100",
+    fx: () => { const r = Math.random();
+      if (r < 0.05) gain(1000, "🎉 刮出头奖！！你差点在工位上尖叫");
+      else if (r < 0.25) gain(100, "🎊 小奖¥100，回本翻倍");
+      else log("🎟️ '谢谢惠顾'。老板说得对，还是搬砖踏实", "bad"); } },
+  { name: "☕ 请全组喝咖啡", price: 200, desc: "三位同事好感各+8",
+    fx: () => { Object.keys(NPCS).forEach(id => S.npc[id] = Math.min(100, S.npc[id] + 8));
+      renderNpc(); log("☕ 你请全组喝了咖啡，人缘直线上升", "good"); } },
+  { name: "💆 极速SPA", price: 300, desc: "心情直接回满",
+    fx: () => { S.mood = 100; log("💆 90分钟精油SPA，你原地复活了", "good"); render(); } },
+  { name: "🧧 给老板送礼", price: 400, desc: "消除1次警告", need: () => S.warnings > 0,
+    fx: () => { S.warnings--; log("🧧 '一点心意不成敬意'，老板笑纳了，警告-1", "good"); render(); } },
+];
+function showShop() {
+  const list = $("shopList"); list.innerHTML = "";
+  const section = t => {
+    const h = document.createElement("div");
+    h.style.cssText = "font-size:12px;color:var(--accent);font-weight:bold;padding:8px 0 2px";
+    h.textContent = t; list.appendChild(h);
+  };
+  const makeRow = (name, desc, btnMaker) => {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed #2a2e42;gap:8px";
+    row.innerHTML = `<div><b>${name}</b><br><small style="color:var(--dim)">${desc}</small></div>`;
+    row.appendChild(btnMaker()); list.appendChild(row);
+  };
+  const btnBase = "width:auto;margin:0;padding:8px 14px;white-space:nowrap";
+  section("⚙️ 装备（一次性 · 永久生效）");
+  GEAR.forEach(g => makeRow(g.name, g.desc, () => {
+    const btn = document.createElement("button");
+    btn.style.cssText = btnBase;
+    if (S.gear[g.id]) { btn.textContent = "✅ 已装备"; btn.disabled = true; btn.style.opacity = ".5"; }
+    else {
+      btn.textContent = `¥${g.price}`;
+      btn.onclick = () => {
+        if (S.money < g.price) { toast("💸 工资不够，先去搬砖吧"); return; }
+        lose(g.price, "");
+        S.gear[g.id] = true;
+        SFX.levelup();
+        log(`🛒 购入「${g.name}」！${g.desc}`, "good");
+        checkAch(); showShop();
+      };
+    }
+    return btn;
+  }));
+  section("🔄 消耗品（无限回购）");
+  CONSUMABLES.forEach(c => makeRow(c.name, c.desc, () => {
+    const btn = document.createElement("button");
+    btn.style.cssText = btnBase;
+    btn.textContent = `¥${c.price}`;
+    if (c.need && !c.need()) { btn.disabled = true; btn.style.opacity = ".5"; }
+    btn.onclick = () => {
+      if (S.money < c.price) { toast("💸 工资不够，先去搬砖吧"); return; }
+      lose(c.price, "");
+      S.consumeCount++;
+      SFX.coin();
+      c.fx();
+      checkAch(); showShop();
+    };
+    return btn;
+  }));
+  $("shopMask").classList.add("show");
+}
+
+// ================== 摸鱼副业 ==================
+const HUSTLES = [
+  { name: "📊 炒股", cost: 100, desc: "押¥100 · 55%概率变¥280",
+    fx: () => Math.random() < 0.55
+      ? gain(280, "📈 今天涨停！你面无表情地关掉了交易软件")
+      : log("📉 绿得发光…¥100打了水漂", "bad") },
+  { name: "✍️ 代写小说", cost: 0, desc: "稳赚小钱 · 略费心神",
+    fx: () => { gain(30 + S.level * 5, "✍️ 又水了三千字，稿费到账"); moodHit(3, ""); } },
+  { name: "🛍️ 直播带货", cost: 200, desc: "押¥200 · 40%概率变¥550",
+    fx: () => Math.random() < 0.4
+      ? gain(550, "🛍️ 一单爆了！家人们把货抢空了")
+      : moodHit(8, "🛍️ 直播间只有3个人，其中2个是机器人…¥200亏了") },
+];
+$("hustleBtn").onclick = () => {
+  if (!S.running || S.paused || now() < S.hustleCd) return;
+  const list = $("hustleList"); list.innerHTML = "";
+  HUSTLES.forEach(h => {
+    const btn = document.createElement("button");
+    btn.innerHTML = `<b>${h.name}</b> <small style="color:var(--dim)">${h.desc}</small>`;
+    btn.onclick = () => {
+      $("hustleMask").classList.remove("show");
+      if (S.money < h.cost) { toast("💸 本金都不够，搞什么副业"); return; }
+      S.hustleCd = now() + 15000; S.hustleCount++;
+      if (S.bossState === "present" && !isProtected()) {
+        warn("🚨 上班搞副业被老板撞个正着！性质恶劣！");
+        lose(100 + h.cost, "💸 罚款加倍，副业本金也没了");
+        resetCombo();
+      } else {
+        if (h.cost) lose(h.cost, "");
+        h.fx();
+      }
+      checkAch(); render();
+    };
+    list.appendChild(btn);
+  });
+  $("hustleMask").classList.add("show");
+};
+
+// ================== 连击 Combo ==================
+function bumpCombo(type) {
+  S.combo = (S.comboType === type && now() - S.comboLast < 2000) ? S.combo + 1 : 1;
+  S.comboType = type; S.comboLast = now();
+  S.maxCombo = Math.max(S.maxCombo, S.combo);
+  S.dayComboBest = Math.max(S.dayComboBest, S.combo);
+  updateCombo();
+  return 1 + Math.min(S.combo, 20) * 0.05; // 最高 x2
+}
+function resetCombo() { S.combo = 0; S.comboType = null; updateCombo(); }
+function updateCombo() { // 固定高度占位，只换文字不推挤布局
+  const el = $("comboV");
+  if (S.combo >= 5) {
+    const mult = (1 + Math.min(S.combo, 20) * 0.05).toFixed(2);
+    el.textContent = `🔥 ${S.comboType === "work" ? "卷王" : "摸鱼"}连击 x${S.combo}！效果 ${mult} 倍`;
+  } else el.textContent = "";
+}
+
+// ================== 本地排行榜 ==================
+function loadLB() { try { return JSON.parse(localStorage.getItem("dgr_lb") || "[]"); } catch (e) { return []; } }
+function saveLB(entry) {
+  try {
+    const lb = loadLB(); lb.push(entry);
+    lb.sort((a, b) => b.score - a.score);
+    localStorage.setItem("dgr_lb", JSON.stringify(lb.slice(0, 10)));
+  } catch (e) { /* 隐私模式等场景静默 */ }
+}
+function showLB() {
+  const lb = loadLB(), list = $("lbList");
+  list.innerHTML = lb.length ? "" : "<div style='color:var(--dim)'>还没有记录，先去打一局！</div>";
+  const medals = ["🥇", "🥈", "🥉"];
+  lb.forEach((e, i) => {
+    const d = document.createElement("div");
+    d.style.cssText = "padding:6px 0;border-bottom:1px dashed #2a2e42";
+    d.innerHTML = `${medals[i] || (i + 1) + "."} <b>¥${e.score}</b> · ${e.day}天 · ${LEVELS[e.level].emoji}${LEVELS[e.level].name}<br><small style="color:var(--dim)">${e.title} · ${e.date}</small>`;
+    list.appendChild(d);
+  });
+  $("lbMask").classList.add("show");
+}
+
+// ================== 同事 NPC ==================
+const NPCS = {
+  kevin: { name: "卷王凯文", emoji: "🤓", perk: "好感≥70：每天帮你推进任务" },
+  aqiang: { name: "摸鱼搭子阿强", emoji: "😎", perk: "好感≥70：被抓时30%概率救场" },
+  lin: { name: "包打听琳姐", emoji: "🕵️‍♀️", perk: "好感≥70：老板预警时间更长" },
+};
+function favorChange(id, n, why) {
+  S.npc[id] = Math.max(0, Math.min(100, S.npc[id] + n));
+  log(`${NPCS[id].emoji} ${NPCS[id].name} 好感${n > 0 ? "+" : ""}${n}${why ? " · " + why : ""}`, n > 0 ? "good" : "bad");
+  renderNpc();
+}
+function renderNpc() {
+  const row = $("npcRow"); row.innerHTML = "";
+  Object.keys(NPCS).forEach(id => {
+    const f = S.npc[id];
+    const d = document.createElement("div");
+    d.style.cssText = "flex:1;min-width:100px;background:var(--panel2);border-radius:8px;padding:6px 8px;font-size:11px;text-align:center";
+    d.title = NPCS[id].perk;
+    const heart = f >= 70 ? "💖" : f >= 30 ? "❤️" : "💔";
+    d.innerHTML = `${NPCS[id].emoji} ${NPCS[id].name}<br>${heart} ${f}${f >= 70 ? " · 罩着你" : f < 30 ? " · 记仇中" : ""}`;
+    row.appendChild(d);
+  });
+}
+const NPC_EVENTS = [
+  { title: "😎 阿强的邀请", desc: "摸鱼搭子阿强约你去楼下便利店买冰可乐。",
+    o1: { t: "走起！", fx: () => { favorChange("aqiang", 10, "一起快乐水"); moodUp(8, "🥤 冰可乐真好喝"); } },
+    o2: { t: "不去，我要卷", fx: () => { favorChange("aqiang", -8); addProgress(8); } } },
+  { title: "🤓 凯文求助", desc: "卷王凯文的代码崩了，红着眼眶找你帮忙。",
+    o1: { t: "帮他看看", fx: () => { favorChange("kevin", 12, "救场之恩"); moodHit(6, "帮人改bug真的很费头发"); } },
+    o2: { t: "假装很忙", fx: () => favorChange("kevin", -10) } },
+  { title: "🕵️‍♀️ 琳姐的八卦", desc: "琳姐凑过来：'听说隔壁部门要裁员，你知道点什么吗？'",
+    o1: { t: "交换情报", fx: () => { favorChange("lin", 12, "情报互通");
+      if (Math.random() < 0.15) warn("💥 你说的话被添油加醋传到了老板耳朵里！"); } },
+    o2: { t: "微笑装傻", fx: () => favorChange("lin", -6) } },
+  { title: "😎 阿强被抓了", desc: "阿强摸鱼被老板逮住，正被训话。他向你投来求救的眼神。",
+    o1: { t: "'他在帮我测功能'", fx: () => { favorChange("aqiang", 15, "过命交情");
+      Math.random() < 0.3 ? warn("😨 老板不信，你也被牵连了！") : log("😮‍💨 老板将信将疑地走了", "good"); } },
+    o2: { t: "深藏功与名", fx: () => favorChange("aqiang", -12) } },
+  { title: "🤓 凯文的凡尔赛", desc: "凯文在群里晒凌晨2点的加班照，老板点了赞。",
+    o1: { t: "跟着卷一波", fx: () => { addProgress(15); moodHit(8, "被迫内卷，身心俱疲"); } },
+    o2: { t: "屏蔽他", fx: () => { moodUp(5, "眼不见心不烦"); favorChange("kevin", -5); } } },
+  { title: "🕵️‍♀️ 琳姐的情报", desc: "琳姐神秘兮兮：'今天老板心情不好，你自己掂量。'",
+    o1: { t: "请她喝奶茶 (¥25)", fx: () => { lose(25, ""); favorChange("lin", 10, "奶茶外交"); moodUp(3, ""); } },
+    o2: { t: "知道了(白嫖)", fx: () => favorChange("lin", -4) } },
+];
+
+// ================== 每日词条 / 老板轮换 / 每日委托 ==================
+const DAILY_MODS = [
+  { id: "none", name: "☀️ 平平无奇的一天", desc: "无特殊效果" },
+  { id: "monday", name: "😩 周一综合症", desc: "心情流失 +50%", decay: 1.5 },
+  { id: "payday", name: "🤑 发薪日", desc: "任务工资 x1.5", pay: 1.5 },
+  { id: "trip", name: "✈️ 老板出差", desc: "巡逻频率减半", bossDelay: 2 },
+  { id: "rain", name: "🌧️ 下雨天", desc: "摸鱼效果 +30%", fish: 1.3 },
+  { id: "lag", name: "🐌 网络卡顿", desc: "工作进度 -20%", work: 0.8 },
+  { id: "audit", name: "📋 集团大检查", desc: "巡逻+50%，但工资+20%", bossDelay: 0.6, pay: 1.2 },
+];
+const BOSSES = [
+  { name: "👔 普通老板", warnT: 1, stayT: 1, freq: 1, sneak: 0 },
+  { name: "⚡ 闪电型老板", warnT: 0.5, stayT: 0.6, freq: 0.8, sneak: 0, desc: "预警极短，来去如风" },
+  { name: "🪑 蹲坑型老板", warnT: 1, stayT: 2, freq: 1.5, sneak: 0, desc: "来得少，一来就赖着不走" },
+  { name: "🕶️ 幽灵型老板", warnT: 1, stayT: 1, freq: 1, sneak: 0.35, desc: "35%概率无预警直接出现" },
+];
+const CHALLENGES = [
+  { name: "🐟 摸鱼60次", chk: () => S.fishClicks - S.dayBase.fish >= 60, prog: () => `${Math.min(60, S.fishClicks - S.dayBase.fish)}/60` },
+  { name: "📋 完成3个任务", chk: () => S.kpiToday >= 3, prog: () => `${Math.min(3, S.kpiToday)}/3` },
+  { name: "🔥 达成15连击", chk: () => S.dayComboBest >= 15, prog: () => `${Math.min(15, S.dayComboBest)}/15` },
+  { name: "💬 回复3条消息", chk: () => S.msgsHandled - S.dayBase.msgs >= 3, prog: () => `${Math.min(3, S.msgsHandled - S.dayBase.msgs)}/3` },
+  { name: "💰 今日入账¥400", chk: () => S.totalEarned - S.dayBase.earned >= 400, prog: () => `¥${Math.min(400, Math.floor(S.totalEarned - S.dayBase.earned))}/400` },
+];
+function chest() {
+  S.chestCount++;
+  const r = Math.random();
+  if (r < 0.4) gain(150 + S.day * 20, "🎁 宝箱开出奖金");
+  else if (r < 0.7) moodUp(30, "🎁 宝箱开出「心情SPA券」，心情+30");
+  else if (S.warnings > 0) { S.warnings--; log("🎁 宝箱开出「警告消除卡」！警告-1", "good"); render(); }
+  else gain(100, "🎁 宝箱开出安慰奖金");
+  SFX.ach();
+}
+function newDaySetup(first) {
+  if (!first) { // NPC 每日结算
+    if (S.npc.kevin >= 70) { addProgress(30); log("🤓 凯文悄悄帮你写了点方案，任务进度+30", "good"); }
+    Object.keys(NPCS).forEach(id => {
+      if (S.npc[id] < 30 && Math.random() < 0.25) lose(40, `😠 ${NPCS[id].name}给你使了绊子，损失¥40`);
+    });
+  }
+  S.dailyMod = S.day === 1 ? DAILY_MODS[0] : DAILY_MODS[Math.floor(Math.random() * DAILY_MODS.length)];
+  S.boss = S.day === 1 ? BOSSES[0] : BOSSES[Math.floor(Math.random() * BOSSES.length)];
+  S.challenge = CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)];
+  S.chDone = false;
+  S.dayBase = { fish: S.fishClicks, msgs: S.msgsHandled, earned: S.totalEarned };
+  S.dayComboBest = 0;
+  if (S.dailyMod.id !== "none") log(`${S.dailyMod.name}：${S.dailyMod.desc}`, "info");
+  if (S.boss.desc) log(`👀 今日轮值：${S.boss.name} — ${S.boss.desc}`, "info");
+  log(`🎁 今日委托：${S.challenge.name}，完成开宝箱！`, "info");
+  render();
+}
+const modOf = k => (S.dailyMod && S.dailyMod[k]) || 1;
+const bossOf = () => S.boss || BOSSES[0];
+
+// ================== 主按钮 ==================
+$("workBtn").onclick = e => {
+  if (!S.running || S.paused) return;
+  S.workClicks++;
+  SFX.work();
+  const boost = S.bossState === "present" ? 2 : 1; // 表演式努力
+  const mult = bumpCombo("work") * (S.gear.keyboard ? 1.25 : 1) * modOf("work");
+  addProgress((3 + Math.random() * 2) * boost * mult);
+  S.mood = Math.max(0, S.mood - 1.2);
+  floatText(boost > 1 ? "表演式努力x2!" : "+进度", "#7aa2f7", e.clientX, e.clientY);
+  if (boost > 1 && Math.random() < 0.3) log("🎭 你在老板面前疯狂敲键盘，进度x2！", "good");
+  render(); checkDeath(); checkAch();
+};
+$("fishBtn").onclick = e => {
+  if (!S.running || S.paused) return;
+  S.fishClicks++;
+  if (S.bossState === "present" && !isProtected()) {
+    if (S.npc.aqiang >= 70 && Math.random() < 0.3) {
+      log("😎 阿强大喊'老板！你快递到前台了！'，成功帮你解围", "good");
+      floatText("兄弟救场!", "#9ece6a", e.clientX, e.clientY);
+      SFX.fish();
+    } else if (S.gear.cat && Math.random() < 0.5) {
+      log("🐈 千钧一发！猫猫跳上老板键盘卖萌，老板被萌住了没看见你", "good");
+      floatText("猫猫救场!", "#9ece6a", e.clientX, e.clientY);
+      SFX.fish();
+    } else {
+      warn("🚨 摸鱼当场被抓！老板脸都绿了！");
+      lose(50, "💸 被扣了¥50绩效");
+      resetCombo();
+      moodHit(10, "");
+      floatText("被抓了!!", "#f7768e", e.clientX, e.clientY);
+    }
+  } else {
+    SFX.fish();
+    const up = (3 + Math.random() * 3) * bumpCombo("fish") * (S.gear.fishtank ? 1.5 : 1) * modOf("fish");
+    S.mood = Math.min(100, S.mood + up);
+    gain(2 + (S.gear.phone ? 3 : 0), "");
+    if (S.gear.massage && Math.random() < 0.1) moodUp(10, "💺 按摩椅触发深度放松模式，心情+10");
+    floatText("+心情", "#9ece6a", e.clientX, e.clientY);
+    if (Math.random() < 0.12) {
+      const fishLogs = ["🐟 你刷了会儿短视频，时间过得飞快", "🛒 购物车又多了三件东西",
+        "📱 和摸鱼搭子交换了一个心照不宣的眼神", "🎮 偷偷看了眼游戏攻略", "☁️ 你盯着窗外发呆，思考人生"];
+      log(fishLogs[Math.floor(Math.random() * fishLogs.length)]);
+    }
+  }
+  render(); checkAch();
+};
+
+// ================== 渲染 & 主循环 ==================
+function render() {
+  $("moneyV").textContent = "¥" + Math.floor(S.money);
+  $("moodV").textContent = Math.floor(S.mood);
+  $("moodFill").style.width = S.mood + "%";
+  const L = LEVELS[S.level];
+  $("levelV").textContent = `${L.emoji} ${L.name}`;
+  const next = LEVELS[S.level + 1];
+  $("levelLabel").textContent = next ? `👔 职级 (下一级 ¥${next.need})` : "👔 职级 (已封顶)";
+  $("warnV").textContent = "●".repeat(S.warnings) + "○".repeat(Math.max(0, 3 - S.warnings));
+  $("warnV").style.color = S.warnings >= 2 ? "#f7768e" : "#e0af68";
+  $("dayV").textContent = S.day;
+  const kt = kpiTarget();
+  $("kpiV").textContent = `🎯 今日KPI ${S.kpiToday}/${kt}`;
+  $("kpiV").style.color = S.kpiToday >= kt ? "var(--green)" : "var(--yellow)";
+  if (S.dailyMod) $("modV").textContent = `${S.dailyMod.name} · ${bossOf().name}`;
+  if (S.challenge) $("chV").textContent = `🎁 ${S.challenge.name} ${S.chDone ? "✅" : S.challenge.prog()}`;
+  if (S.task) {
+    $("taskName").textContent = "📋 当前任务：" + S.task.name;
+    const p = Math.min(100, Math.floor(S.task.progress));
+    $("taskFill").style.width = p + "%";
+    $("taskPct").textContent = p + "%";
+  }
+}
+
+function checkDeath() {
+  if (!S.running) return;
+  if (S.mood <= 0) endGame("😭 你 emo 了", "心情归零，你把工牌拍在桌上，提桶跑路。<br>「此处不留爷，自有留爷处！」");
+  else if (S.warnings >= 3) endGame("📦 你被开除了", "第3次被抓现行，老板请你去了小会议室。<br>HR已经把纸箱放在你工位上了。");
+}
+function endGame(title, desc) {
+  S.running = false;
+  SFX.over();
+  clearTimeout(bossTimeout); clearInterval(msgTimer); clearInterval(qteTimer); clearInterval(stepTimer); clearInterval(sirenTimer);
+  $("msgPop").style.display = "none";
+  $("eventMask").classList.remove("show");
+  $("qteMask").classList.remove("show");
+  $("hustleMask").classList.remove("show");
+  $("shopMask").classList.remove("show");
+  // 保存到本地排行榜
+  const score = Math.floor(S.totalEarned);
+  saveLB({ score, day: S.day, level: S.level, title, date: new Date().toLocaleDateString() });
+  const best = loadLB()[0];
+  const lbLine = best ? `<br>🏅 历史最高 ¥${best.score}${score >= best.score ? " · 🎉 新纪录！" : ""}` : "";
+  $("overTitle").textContent = title;
+  $("overDesc").innerHTML = `${desc}<br><br>
+    📊 <b>最终战绩</b><br>
+    存活 ${S.day} 天 · 职级 ${LEVELS[S.level].emoji}${LEVELS[S.level].name}<br>
+    💰 总收入 ¥${Math.floor(S.totalEarned)} · ✅ 完成任务 ${S.tasksDone} 个<br>
+    🐟 摸鱼 ${S.fishClicks} 次 · 🔥 最高连击 x${S.maxCombo}<br>
+    🏆 成就 ${unlockedAch.size}/${ACHIEVEMENTS.length} · 🎲 副业 ${S.hustleCount} 次${lbLine}`;
+  $("overMask").classList.add("show");
+}
+
+setInterval(() => { // 每秒tick
+  if (!S.running || S.paused) return;
+  S.mood = Math.max(0, S.mood - 0.35 * (S.gear.chair ? 0.7 : 1) * modOf("decay")); // 心情自然流失
+  if (S.gear.window_seat) S.mood = Math.min(100, S.mood + 0.15); // 靠窗工位被动回复
+  if (S.combo > 0 && now() - S.comboLast > 2500) resetCombo(); // 连击超时
+  if (S.totalEarned >= 15000) { // 财务自由结局
+    endGame("🏝️ 财务自由结局", "你攒够了¥15000，当场裸辞，去大理开了家民宿。<br>工作群里的同事还在加班，而你在看洱海日落。");
+    return;
+  }
+  S.dayTimer++;
+  if (S.dayTimer >= 45) { // 45秒 = 1天
+    S.dayTimer = 0;
+    // —— KPI 考核 ——
+    const target = kpiTarget();
+    if (S.kpiToday >= target) {
+      S.kpiFails = 0;
+      gain(30 + S.level * 10, `🎯 今日KPI达标(${S.kpiToday}/${target})！绩效奖金到账`);
+    } else {
+      S.kpiFails++;
+      lose(80, `📉 KPI没达标(${S.kpiToday}/${target})，被扣绩效¥80`);
+      moodHit(12, "😞 被老板约谈了半小时…心情-12");
+      if (S.kpiFails >= 2) { warn("🚨 连续两天KPI不达标，老板下了最后通牒！"); S.kpiFails = 0; }
+    }
+    S.kpiToday = 0; S.day++;
+    const bonus = 20 + S.level * 10;
+    gain(bonus, `🌅 新的一天开始了！日结基本工资`);
+    toast(`📅 第 ${S.day} 天 · 今日KPI目标：完成${kpiTarget()}个任务${S.day >= 3 ? " · 老板巡逻变勤了⚠️" : ""}`);
+    if (S.day >= 11) { // 熬过10天 → 结算结局
+      if (S.fishClicks >= S.workClicks * 1.5)
+        endGame("🐟 摸鱼之神结局", "十天里你摸鱼的次数远超干活。<br>你悟了：工资是老板发的，快乐是自己摸的。");
+      else if (S.workClicks >= S.fishClicks * 3)
+        endGame("🌀 卷王结局", "十天高强度输出，你卷赢了整层楼。<br>老板感动落泪，同事敢怒不敢言。");
+      else
+        endGame("⚖️ 六边形打工人结局", "该卷的时候卷，该摸的时候摸。<br>你掌握了打工的终极奥义：平衡。");
+      return;
+    }
+    newDaySetup();
+  }
+  if (S.challenge && !S.chDone && S.challenge.chk()) { // 每日委托达成
+    S.chDone = true;
+    toast(`🎁 委托完成：${S.challenge.name}！开宝箱`);
+    chest();
+  }
+  if (S.mood < 25 && Math.random() < 0.15) log("😵 心情很低了，快摸会儿鱼吧…", "bad");
+  render(); checkDeath(); checkAch(); tickSkillCd();
+}, 1000);
+setInterval(tickSkillCd, 200);
+
+// ================== 启动 ==================
+$("startBtn").onclick = () => {
+  $("startMask").classList.remove("show");
+  S.running = true;
+  newTask();
+  renderSkills();
+  newDaySetup(true);
+  renderNpc();
+  log("🌅 早上9点，你刷卡进了公司。新的一天开始了。", "info");
+  scheduleBoss(); scheduleMsg(); scheduleEvent(); scheduleQte();
+  toast(`🎯 今日KPI目标：完成${kpiTarget()}个任务`);
+  render();
+};
+$("sndBtn").onclick = () => {
+  muted = !muted;
+  $("sndBtn").textContent = muted ? "🔇 静音" : "🔊 音效";
+  if (!muted) SFX.coin();
+};
+// ================== 背景漂浮装饰 ==================
+(function () {
+  const deco = $("bgDeco");
+  const emojis = ["💼", "☕", "🐟", "📄", "💰", "🖥️", "📎", "⌨️", "🧋", "📊", "🪑", "😴"];
+  for (let i = 0; i < 16; i++) {
+    const s = document.createElement("span");
+    s.textContent = emojis[i % emojis.length];
+    s.style.left = Math.random() * 96 + "%";
+    s.style.fontSize = (18 + Math.random() * 30) + "px";
+    s.style.animationDuration = (14 + Math.random() * 20) + "s";
+    s.style.animationDelay = (-Math.random() * 25) + "s";
+    deco.appendChild(s);
+  }
+})();
+
+// iOS Safari 双击缩放兜底（部分版本无视 viewport 设置）
+// 快速连点时阻止默认行为(缩放)，但手动补发 click 保证连点手感
+let lastTouch = 0;
+document.addEventListener("touchend", e => {
+  const t = now();
+  if (t - lastTouch < 350) {
+    e.preventDefault();
+    const el = e.target.closest("button");
+    if (el) el.click();
+  }
+  lastTouch = t;
+}, { passive: false });
+document.addEventListener("gesturestart", e => e.preventDefault());
+document.addEventListener("dblclick", e => e.preventDefault(), { passive: false });
+
+renderSkills(); render();
+</script>
+</body>
+</html>
